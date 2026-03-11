@@ -147,13 +147,4 @@ if __name__ == "__main__":
 
 ---
 
-**File 2 — Replace `requirements.txt` with this:**
-```
-flask
-flask-session
-langchain
-langchain-groq
-langchain-community
-langchain-core
-duckduckgo-search
-firebase-admin
+
