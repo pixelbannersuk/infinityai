@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify, render_template, session
 from flask_session import Session
 from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_community.tools import DuckDuckGoSearchRun
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import HumanMessage, AIMessage
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 import os, json
