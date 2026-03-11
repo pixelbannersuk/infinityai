@@ -1,2 +1,8 @@
-streamlit
-groq
+flask
+flask-session
+langchain
+langchain-groq
+langchain-community
+langchain-core
+duckduckgo-search
+firebase-admin
