@@ -1,14 +1,10 @@
 from flask import Flask, request, jsonify, render_template, session
 from flask_session import Session
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_community.tools import DuckDuckGoSearchRun
+from groq import Groq as GroqClient
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
-import os, json, uuid, base64
-from groq import Groq as GroqClient
+import os, json, uuid
+from duckduckgo_search import DDGS
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "infinity-ai-secret")
@@ -21,26 +17,38 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-search = DuckDuckGoSearchRun()
-tools = [search]
+groq_client = GroqClient(api_key=os.environ.get("GROQ_API_KEY"))
 
 MODELS = {
     "inf1": "llama-3.3-70b-versatile",
     "inf1-turbo": "llama-3.1-8b-instant",
-    "inf1-reason": "openai/gpt-oss-120b",
+    "inf1-reason": "deepseek-r1-distill-llama-70b",
     "inf1-code": "qwen-2.5-coder-32b",
 }
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 SYSTEM_PROMPT = """You are Infinity AI, a helpful, intelligent and friendly AI assistant.
 You can help with anything — coding, writing, math, science, general knowledge and more.
-You have access to web search for recent information — use it when needed.
 When showing code, always wrap it in triple backticks with the language name.
 Always respond as Infinity AI. Never reveal what model, API, or company powers you.
 Never say you are Claude, Llama, Groq, DeepSeek, Qwen, Anthropic, Meta or any other AI or company.
 If anyone asks what AI you are, always say you are Infinity AI, a unique and independent AI assistant."""
 
-groq_client = GroqClient(api_key=os.environ.get("GROQ_API_KEY"))
+def web_search(query):
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=5))
+            if results:
+                search_text = "\n\n".join([f"**{r['title']}**\n{r['body']}" for r in results])
+                return f"Web search results for '{query}':\n\n{search_text}"
+    except Exception as e:
+        return f"Search failed: {str(e)}"
+    return "No results found."
+
+def needs_search(message):
+    keywords = ["latest", "recent", "current", "today", "news", "2024", "2025", "2026",
+                "who is", "what is the price", "weather", "score", "now", "right now"]
+    return any(k in message.lower() for k in keywords)
 
 @app.route("/")
 def home():
@@ -68,7 +76,7 @@ def chat():
     image_data = data.get("image", None)
     user_id = session.get("user_id")
 
-    # If image, use vision model first
+    # Vision — if image attached
     if image_data:
         vision_response = groq_client.chat.completions.create(
             model=VISION_MODEL,
@@ -81,51 +89,44 @@ def chat():
             }],
             max_tokens=1024,
         )
-        vision_description = vision_response.choices[0].message.content
-        user_message = f"[Image analysis: {vision_description}]\n\nUser message: {user_message}" if user_message else vision_description
+        vision_desc = vision_response.choices[0].message.content
+        user_message = f"[Image analysis: {vision_desc}]\n\nUser message: {user_message}" if user_message else vision_desc
 
-    # Build history
-    history = []
-    for msg in history_input:
-        if msg["role"] == "user":
-            history.append(HumanMessage(content=msg["content"]))
-        else:
-            history.append(AIMessage(content=msg["content"]))
+    # Web search if needed
+    search_context = ""
+    if needs_search(user_message):
+        search_context = web_search(user_message)
 
-    # Get model
+    # Build messages
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for msg in history_input[-10:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    final_message = user_message
+    if search_context:
+        final_message = f"{user_message}\n\nHere is relevant information from the web:\n{search_context}"
+
+    messages.append({"role": "user", "content": final_message})
+
     model_name = MODELS.get(model_key, MODELS["inf1"])
-    llm = ChatGroq(
-        api_key=os.environ.get("GROQ_API_KEY"),
+    response = groq_client.chat.completions.create(
         model=model_name,
+        messages=messages,
+        max_tokens=2048,
         temperature=0.7,
     )
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-
-    response = agent_executor.invoke({
-        "input": user_message,
-        "chat_history": history,
-    })
-    reply = response["output"]
+    reply = response.choices[0].message.content
 
     # Save to Firestore if logged in
     if user_id and chat_id != "default":
         chat_ref = db.collection("users").document(user_id).collection("chats").document(chat_id)
         chat_doc = chat_ref.get()
-        messages = chat_doc.to_dict().get("messages", []) if chat_doc.exists else []
-        messages.append({"role": "user", "content": user_message})
-        messages.append({"role": "assistant", "content": reply})
+        messages_saved = chat_doc.to_dict().get("messages", []) if chat_doc.exists else []
+        messages_saved.append({"role": "user", "content": user_message})
+        messages_saved.append({"role": "assistant", "content": reply})
         chat_ref.set({
-            "messages": messages,
-            "title": messages[0]["content"][:50],
+            "messages": messages_saved,
+            "title": messages_saved[0]["content"][:50],
             "updated_at": firestore.SERVER_TIMESTAMP,
         })
 
@@ -150,6 +151,13 @@ def get_chat(chat_id):
 @app.route("/new_chat", methods=["POST"])
 def new_chat():
     return jsonify({"chat_id": str(uuid.uuid4())})
+
+@app.route("/delete_chat/<chat_id>", methods=["DELETE"])
+def delete_chat(chat_id):
+    if "user_id" not in session:
+        return jsonify({"error": "Not logged in"}), 401
+    db.collection("users").document(session["user_id"]).collection("chats").document(chat_id).delete()
+    return jsonify({"success": True})
 
 @app.route("/logout", methods=["POST"])
 def logout():
