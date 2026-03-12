@@ -27,10 +27,10 @@ tools = [search]
 MODELS = {
     "inf1": "llama-3.3-70b-versatile",
     "inf1-turbo": "llama-3.1-8b-instant",
-    "inf1-reason": "deepseek-r1-distill-llama-70b",
-    "inf1-code": "qwen-2.5-32b",
+    "inf1-reason": "openai/gpt-oss-120b",
+    "inf1-code": "qwen-2.5-coder-32b",
 }
-VISION_MODEL = "llama-3.2-90b-vision-preview"
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 SYSTEM_PROMPT = """You are Infinity AI, a helpful, intelligent and friendly AI assistant.
 You can help with anything — coding, writing, math, science, general knowledge and more.
