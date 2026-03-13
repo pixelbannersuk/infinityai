@@ -1,604 +1,646 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infinity AI</title>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-       body { background: #0a0a0a; color: #e0e0e0; font-family: 'Century Gothic', CenturyGothic, AppleGothic, 'Trebuchet MS', sans-serif; height: 100vh; display: flex; overflow: hidden; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Infinity AI — Chat</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #0A0E1A;
+      --bg2:       #0F1528;
+      --bg3:       #141930;
+      --purple:    #7B2FFF;
+      --purple-dim:#4B1FBF;
+      --cyan:      #00D4FF;
+      --cyan-dim:  #0099BB;
+      --white:     #FFFFFF;
+      --grey:      #A8B2D8;
+      --grey-dim:  #3D4466;
+      --border:    rgba(123,47,255,0.25);
+      --glow-p:    rgba(123,47,255,0.4);
+      --glow-c:    rgba(0,212,255,0.3);
+    }
 
-        /* Sidebar */
-        #sidebar { width: 260px; background: #111; display: flex; flex-direction: column; padding: 12px; gap: 8px; border-right: 1px solid #1e1e1e; transition: width 0.3s; overflow: hidden; }
-        #sidebar.collapsed { width: 0; padding: 0; }
-        #logo { display: flex; align-items: center; gap: 10px; padding: 10px; }
-        #logo h2 { font-size: 18px; color: #a855f7; font-weight: bold; white-space: nowrap; }
-        #new-chat-btn { background: #1a1a1a; color: #e0e0e0; border: 1px solid #2a2a2a; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px; width: 100%; font-family: inherit; text-align: left; white-space: nowrap; }
-        #new-chat-btn:hover { background: #222; }
-        #chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-        .chat-item { padding: 9px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-item:hover { background: #1a1a1a; color: #fff; }
-        .chat-item.active { background: #1e1e1e; color: #fff; }
-        #user-area { border-top: 1px solid #1e1e1e; padding-top: 10px; }
-        #sign-in-btn { background: #a855f7; color: white; border: none; padding: 9px; border-radius: 8px; cursor: pointer; font-size: 13px; width: 100%; font-family: inherit; white-space: nowrap; }
-        #sign-in-btn:hover { background: #9333ea; }
-        #user-profile { display: none; align-items: center; gap: 8px; padding: 6px; }
-        #user-photo { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; }
-        #user-name { font-size: 12px; flex: 1; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #logout-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 11px; font-family: inherit; white-space: nowrap; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Main */
-        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-        #topbar { padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e1e1e; }
-        #toggle-sidebar { background: none; border: none; color: #888; cursor: pointer; font-size: 18px; padding: 4px; flex-shrink: 0; }
-        #toggle-sidebar:hover { color: #fff; }
-        #chat-title { font-size: 14px; color: #888; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #settings-btn { background: none; border: none; color: #888; cursor: pointer; font-size: 18px; flex-shrink: 0; }
-        #settings-btn:hover { color: #fff; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
 
-        /* Messages */
-        #messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
-        #welcome { text-align: center; margin: auto; }
-        #welcome h1 { font-size: 32px; color: #a855f7; margin-bottom: 8px; }
-        #welcome p { color: #555; font-size: 14px; margin-bottom: 24px; }
-        .suggestion-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-        .chip { background: #1a1a1a; border: 1px solid #2a2a2a; color: #aaa; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 12px; font-family: inherit; }
-        .chip:hover { background: #222; color: #fff; border-color: #a855f7; }
-        .message { display: flex; gap: 12px; max-width: 85%; }
-        .message.user { align-self: flex-end; flex-direction: row-reverse; }
-        .message.ai { align-self: flex-start; }
-        .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
-        .user .avatar { background: #a855f7; }
-        .ai .avatar { background: #1a1a1a; border: 1px solid #2a2a2a; }
-        .message-bubble { padding: 12px 16px; border-radius: 12px; line-height: 1.7; font-size: 14px; word-break: break-word; }
-        .user .message-bubble { background: #a855f7; border-radius: 12px 12px 2px 12px; }
-        .ai .message-bubble { background: #111; border: 1px solid #1e1e1e; border-radius: 12px 12px 12px 2px; }
-        .pasted-image { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px; display: block; }
+    /* ── Star field ── */
+    #stars {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(123,47,255,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 85%, rgba(0,212,255,0.10) 0%, transparent 55%),
+        var(--bg);
+    }
+    #stars::before, #stars::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 40% 55%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 65% 15%, rgba(200,200,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 75%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 55% 85%, rgba(200,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5%  50%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 35% 35%, rgba(255,255,255,0.5) 0%, transparent 100%);
+    }
+    #stars::after {
+      transform: translateY(0);
+      animation: drift 60s linear infinite;
+      opacity: 0.5;
+    }
+    @keyframes drift { to { transform: translateY(-60px) translateX(20px); } }
 
-        /* Loading infinity */
-        .infinity-loader { font-size: 24px; animation: spin-infinity 1.5s linear infinite; display: inline-block; }
-        @keyframes spin-infinity { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    /* ── Layout ── */
+    .shell {
+      position: relative; z-index: 1;
+      display: flex; height: 100vh; width: 100vw;
+    }
 
-        /* Code */
-        .code-wrapper { position: relative; margin: 8px 0; }
-        .code-wrapper pre { border-radius: 8px; padding: 16px !important; font-size: 13px; }
-        .copy-btn { position: absolute; top: 8px; right: 8px; background: #2a2a2a; border: 1px solid #3a3a3a; color: #aaa; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: inherit; }
-        .copy-btn:hover { background: #333; color: #fff; }
-        .copy-btn.copied { color: #4ade80; border-color: #4ade80; }
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 260px; flex-shrink: 0;
+      background: rgba(15,21,40,0.85);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 0;
+      animation: slideInLeft 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes slideInLeft { from { transform: translateX(-30px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-        /* Input area */
-        #input-area { padding: 12px 24px 16px; border-top: 1px solid #1e1e1e; }
-        #input-wrapper { background: #111; border: 1px solid #2a2a2a; border-radius: 14px; padding: 10px 14px; transition: border-color 0.2s; }
-        #input-wrapper:focus-within { border-color: #a855f7; }
-        #input-top { display: flex; gap: 8px; align-items: flex-end; }
-        #input { flex: 1; background: none; border: none; color: #e0e0e0; font-size: 14px; outline: none; resize: none; font-family: inherit; max-height: 150px; line-height: 1.5; }
-        #input-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
-        #image-upload-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 18px; padding: 4px; }
-        #image-upload-btn:hover { color: #a855f7; }
-        #send { background: #a855f7; color: white; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
-        #send:hover { background: #9333ea; }
-        #send:disabled { background: #333; cursor: not-allowed; }
-        #input-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1e1e1e; }
-        #model-picker { background: none; border: none; color: #666; font-size: 12px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 6px; }
-        #model-picker:hover { background: #1a1a1a; color: #aaa; }
-        #model-dropdown { display: none; position: absolute; bottom: 100px; left: 24px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 6px; min-width: 220px; z-index: 50; }
-        #model-dropdown.open { display: block; }
-        .model-option { padding: 10px 12px; border-radius: 6px; cursor: pointer; }
-        .model-option:hover { background: #222; }
-        .model-option.active { background: #2a1a4a; }
-        .model-name { font-size: 13px; color: #e0e0e0; }
-        .model-desc { font-size: 11px; color: #666; margin-top: 2px; }
-        #hint { font-size: 11px; color: #444; }
+    .logo-wrap {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 18px var(--glow-p);
+      flex-shrink: 0;
+    }
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800; font-size: 20px;
+      background: linear-gradient(90deg, var(--white), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
 
-        /* Image preview */
-        #image-preview-area { display: none; padding: 8px 0; }
-        #image-preview { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 1px solid #2a2a2a; }
-        #remove-image { background: #2a2a2a; border: none; color: #aaa; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; font-size: 12px; margin-left: 6px; }
+    .new-chat-btn {
+      margin: 18px 16px 8px;
+      padding: 11px 16px;
+      background: linear-gradient(135deg, var(--purple), #5B1FDF);
+      border: none; border-radius: 10px;
+      color: var(--white); font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      transition: box-shadow 0.2s, transform 0.15s;
+      box-shadow: 0 4px 20px var(--glow-p);
+    }
+    .new-chat-btn:hover { box-shadow: 0 6px 28px var(--glow-p); transform: translateY(-1px); }
+    .new-chat-btn:active { transform: translateY(0); }
 
-        /* Loading overlay */
-        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 300; align-items: center; justify-content: center; }
-        #loading-overlay.show { display: flex; }
-        .loading-circle { width: 48px; height: 48px; border: 3px solid #2a2a2a; border-top-color: #a855f7; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+    .section-label {
+      padding: 16px 20px 6px;
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--grey-dim);
+    }
 
-        /* Settings panel */
-        #settings-panel { position: fixed; right: -320px; top: 0; width: 320px; height: 100%; background: #111; border-left: 1px solid #1e1e1e; padding: 24px; transition: right 0.3s; z-index: 100; overflow-y: auto; }
-        #settings-panel.open { right: 0; }
-        #settings-panel h3 { color: #a855f7; margin-bottom: 20px; font-size: 16px; }
-        .setting-group { margin-bottom: 20px; }
-        .setting-group label { font-size: 12px; color: #888; display: block; margin-bottom: 8px; }
-        .setting-group select, .setting-group input[type="range"] { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; color: #e0e0e0; padding: 8px; border-radius: 6px; font-family: inherit; font-size: 13px; }
-        #close-settings { background: none; border: none; color: #888; cursor: pointer; font-size: 20px; float: right; }
+    .history-list { flex: 1; overflow-y: auto; padding: 4px 10px; }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-list::-webkit-scrollbar-thumb { background: var(--grey-dim); border-radius: 99px; }
 
-        /* Login modal */
-        #login-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
-        #login-modal.open { display: flex; }
-        #login-box { background: #111; border: 1px solid #2a2a2a; padding: 40px; border-radius: 16px; text-align: center; width: 340px; }
-        #login-box h2 { color: #a855f7; margin-bottom: 8px; }
-        #login-box p { color: #666; font-size: 13px; margin-bottom: 24px; }
-        #google-signin { background: #fff; color: #333; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 10px; margin: 0 auto 12px; font-family: inherit; width: 100%; justify-content: center; }
-        #google-signin:hover { background: #f0f0f0; }
-        #close-login { background: none; border: none; color: #666; cursor: pointer; font-size: 13px; font-family: inherit; }
+    .history-item {
+      padding: 10px 12px; border-radius: 8px;
+      font-size: 13px; color: var(--grey);
+      cursor: pointer; display: flex; align-items: center; gap: 9px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .history-item:hover { background: rgba(123,47,255,0.12); color: var(--white); }
+    .history-item.active { background: rgba(123,47,255,0.2); color: var(--white); }
+    .history-item svg { flex-shrink: 0; opacity: 0.5; }
 
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
-    </style>
+    .sidebar-footer {
+      padding: 16px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple-dim), var(--cyan-dim));
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px;
+      color: var(--white); flex-shrink: 0;
+      border: 1.5px solid var(--border);
+    }
+    .user-info { flex: 1; overflow: hidden; }
+    .user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-plan {
+      font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* ── Main chat area ── */
+    .chat-area {
+      flex: 1; display: flex; flex-direction: column;
+      min-width: 0;
+      animation: fadeIn 0.6s ease both 0.1s;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+    .chat-header {
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(10,14,26,0.6); backdrop-filter: blur(12px);
+    }
+    .chat-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; }
+    .status-dot {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--cyan);
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .header-actions { display: flex; gap: 8px; }
+    .hbtn {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: var(--grey); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+      font-size: 15px;
+    }
+    .hbtn:hover { background: rgba(123,47,255,0.2); color: var(--white); }
+
+    /* ── Messages ── */
+    .messages {
+      flex: 1; overflow-y: auto;
+      padding: 32px 32px 16px;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--grey-dim); border-radius: 99px; }
+
+    /* welcome */
+    .welcome {
+      text-align: center; padding: 40px 20px 20px;
+      animation: fadeIn 0.6s ease both 0.3s;
+    }
+    .welcome-orb {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 0 40px var(--glow-p), 0 0 80px var(--glow-c);
+      animation: orbFloat 4s ease-in-out infinite;
+    }
+    @keyframes orbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .welcome h1 {
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px;
+      background: linear-gradient(90deg, var(--white) 40%, var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+    .welcome p { color: var(--grey); font-size: 15px; line-height: 1.6; max-width: 420px; margin: 0 auto 28px; }
+
+    .suggestions {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+    }
+    .sug-btn {
+      padding: 9px 16px; border-radius: 20px;
+      background: rgba(123,47,255,0.1);
+      border: 1px solid var(--border);
+      color: var(--grey); font-family: 'DM Sans', sans-serif;
+      font-size: 13px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sug-btn:hover {
+      background: rgba(123,47,255,0.25);
+      border-color: var(--purple); color: var(--white);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px var(--glow-p);
+    }
+
+    /* message rows */
+    .msg { display: flex; gap: 14px; animation: msgIn 0.35s cubic-bezier(0.22,1,0.36,1) both; }
+    @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .msg-avatar {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; font-family: 'Syne', sans-serif;
+      margin-top: 2px;
+    }
+    .msg.ai .msg-avatar {
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      box-shadow: 0 0 14px var(--glow-p);
+      color: var(--white);
+    }
+    .msg.user .msg-avatar {
+      background: linear-gradient(135deg, var(--purple-dim), var(--cyan-dim));
+      border: 1.5px solid var(--border);
+      color: var(--white);
+    }
+
+    .msg-body { max-width: 68%; display: flex; flex-direction: column; gap: 4px; }
+    .msg.user .msg-body { align-items: flex-end; }
+
+    .msg-sender { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--grey-dim); }
+
+    .msg-bubble {
+      padding: 14px 18px; border-radius: 16px;
+      font-size: 14.5px; line-height: 1.65;
+    }
+    .msg.ai .msg-bubble {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--white);
+      border-top-left-radius: 4px;
+    }
+    .msg.user .msg-bubble {
+      background: linear-gradient(135deg, var(--purple), #5B1FDF);
+      color: var(--white);
+      border-top-right-radius: 4px;
+      box-shadow: 0 4px 20px var(--glow-p);
+    }
+
+    .msg-meta { display: flex; align-items: center; gap: 10px; }
+    .msg-time { font-size: 11px; color: var(--grey-dim); }
+    .msg-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+    .msg:hover .msg-actions { opacity: 1; }
+    .mact {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: transparent; border: none;
+      color: var(--grey-dim); cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .mact:hover { background: rgba(255,255,255,0.08); color: var(--grey); }
+
+    /* typing indicator */
+    .typing { display: flex; gap: 5px; align-items: center; padding: 14px 18px; }
+    .typing span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--cyan); display: block;
+      animation: typingDot 1.2s ease-in-out infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; background: var(--purple); }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingDot { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+
+    /* ── Input area ── */
+    .input-wrap {
+      padding: 16px 32px 24px;
+      background: rgba(10,14,26,0.7); backdrop-filter: blur(12px);
+    }
+    .input-box {
+      display: flex; align-items: flex-end; gap: 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 12px 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-box:focus-within {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 3px rgba(123,47,255,0.15), 0 0 20px var(--glow-p);
+    }
+    .input-actions-left { display: flex; gap: 4px; padding-bottom: 2px; }
+    .iact {
+      width: 30px; height: 30px; border-radius: 7px;
+      background: transparent; border: none;
+      color: var(--grey-dim); cursor: pointer; font-size: 15px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .iact:hover { background: rgba(255,255,255,0.07); color: var(--grey); }
+
+    #chatInput {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--white); font-family: 'DM Sans', sans-serif;
+      font-size: 14.5px; line-height: 1.5; resize: none;
+      max-height: 160px; min-height: 24px;
+    }
+    #chatInput::placeholder { color: var(--grey-dim); }
+
+    #sendBtn {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--purple), #5B1FDF);
+      border: none; color: var(--white);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+      transition: box-shadow 0.2s, transform 0.15s, opacity 0.2s;
+      box-shadow: 0 4px 16px var(--glow-p);
+    }
+    #sendBtn:hover { transform: scale(1.07); box-shadow: 0 6px 24px var(--glow-p); }
+    #sendBtn:active { transform: scale(0.96); }
+    #sendBtn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+    .input-footer {
+      text-align: center; margin-top: 10px;
+      font-size: 11px; color: var(--grey-dim);
+    }
+
+    /* ── Scrollbar global ── */
+    * { scrollbar-width: thin; scrollbar-color: var(--grey-dim) transparent; }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .sidebar { display: none; }
+      .messages { padding: 20px 16px 12px; }
+      .input-wrap { padding: 12px 14px 20px; }
+      .chat-header { padding: 16px 18px; }
+    }
+  </style>
 </head>
 <body>
 
-<!-- Loading overlay -->
-<div id="loading-overlay">
-    <div class="loading-circle"></div>
-</div>
+<div id="stars"></div>
 
-<!-- Login Modal -->
-<div id="login-modal">
-    <div id="login-box">
-        <h2>♾️ Sign in</h2>
-        <p>Sign in to save your chats across devices</p>
-        <button id="google-signin">
-            <img src="https://www.google.com/favicon.ico" width="18" alt="G">
-            Continue with Google
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo-wrap">
+      <div class="logo-icon">∞</div>
+      <span class="logo-text">Infinity AI</span>
+    </div>
+
+    <button class="new-chat-btn" onclick="newChat()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Conversation
+    </button>
+
+    <div class="section-label">Recent</div>
+    <div class="history-list" id="historyList">
+      <div class="history-item active">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Welcome to Infinity AI
+      </div>
+      <div class="history-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Product launch strategy
+      </div>
+      <div class="history-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Website content review
+      </div>
+      <div class="history-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Data analysis Q3
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar">IN</div>
+      <div class="user-info">
+        <div class="user-name">Infinity Team</div>
+        <div class="user-plan">Pro Plan</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Chat -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <div>
+        <div class="chat-title">Infinity AI Assistant</div>
+      </div>
+      <div class="status-dot"><div class="dot"></div> Online</div>
+      <div class="header-actions">
+        <button class="hbtn" title="Search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
-        <button id="close-login">Continue without signing in</button>
+        <button class="hbtn" title="Settings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
     </div>
-</div>
 
-<!-- Settings Panel -->
-<div id="settings-panel">
-    <button id="close-settings">✕</button>
-    <h3>⚙️ Settings</h3>
-    <div class="setting-group">
-        <label>Temperature: <span id="temp-value">0.7</span></label>
-        <input type="range" id="temp-slider" min="0" max="1" step="0.1" value="0.7">
-    </div>
-    <div class="setting-group">
-        <label>Theme</label>
-        <select id="theme-select">
-            <option value="dark">Dark (Default)</option>
-            <option value="darker">Darker</option>
-            <option value="midnight">Midnight Blue</option>
-            <option value="forest">Forest Dark</option>
-        </select>
-    </div>
-    <div class="setting-group">
-        <label>Font Size</label>
-        <select id="font-size-select">
-            <option value="13px">Small</option>
-            <option value="14px" selected>Medium</option>
-            <option value="16px">Large</option>
-        </select>
-    </div>
-</div>
-
-<!-- Model dropdown -->
-<div id="model-dropdown">
-    <div class="model-option active" data-model="inf1">
-        <div class="model-name">♾️ INF-1</div>
-        <div class="model-desc">Best overall — smart, fast, web search</div>
-    </div>
-    <div class="model-option" data-model="inf1-turbo">
-        <div class="model-name">⚡ INF-1 Turbo</div>
-        <div class="model-desc">Fastest responses</div>
-    </div>
-    <div class="model-option" data-model="inf1-reason">
-        <div class="model-name">🧠 INF-1 Reason</div>
-        <div class="model-desc">Deep thinking, math, logic</div>
-    </div>
-    <div class="model-option" data-model="inf1-code">
-        <div class="model-name">💻 INF-1 Code</div>
-        <div class="model-desc">Best for coding tasks</div>
-    </div>
-</div>
-
-<!-- Sidebar -->
-<div id="sidebar">
-    <div id="logo"><h2>♾️ Infinity AI</h2></div>
-    <button id="new-chat-btn">✏️ New Chat</button>
-    <div id="chat-list"></div>
-    <div id="user-area">
-        <button id="sign-in-btn">Sign in to save chats</button>
-        <div id="user-profile">
-            <img id="user-photo" src="" alt="">
-            <span id="user-name"></span>
-            <button id="logout-btn">Sign out</button>
+    <div class="messages" id="messages">
+      <!-- Welcome state -->
+      <div class="welcome" id="welcome">
+        <div class="welcome-orb">∞</div>
+        <h1>How can I help you today?</h1>
+        <p>Infinity AI is ready to assist you with anything — from creative projects to complex analysis and beyond.</p>
+        <div class="suggestions">
+          <button class="sug-btn" onclick="sendSuggestion(this)">✦ Write me a product pitch</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">⚡ Summarise this document</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">🔭 Explain quantum computing</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">🎨 Design ideas for my brand</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">📊 Analyse my data</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">💡 Help me brainstorm</button>
         </div>
+      </div>
     </div>
-</div>
 
-<!-- Main -->
-<div id="main">
-    <div id="topbar">
-        <button id="toggle-sidebar">☰</button>
-        <span id="chat-title">New Chat</span>
-        <button id="settings-btn">⚙️</button>
-    </div>
-    <div id="messages">
-        <div id="welcome">
-            <h1>♾️ Infinity AI</h1>
-            <p>Your intelligent assistant. Ask me anything.</p>
-            <div class="suggestion-chips">
-                <button class="chip" onclick="useChip(this)">✍️ Help me write something</button>
-                <button class="chip" onclick="useChip(this)">💻 Help me code</button>
-                <button class="chip" onclick="useChip(this)">🔍 Search the web</button>
-                <button class="chip" onclick="useChip(this)">🧠 Explain a concept</button>
-            </div>
+    <div class="input-wrap">
+      <div class="input-box">
+        <div class="input-actions-left">
+          <button class="iact" title="Attach file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
         </div>
+        <textarea id="chatInput" rows="1" placeholder="Ask Infinity anything…" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <button id="sendBtn" onclick="sendMessage()" title="Send">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="input-footer">Infinity AI may make mistakes. Always verify important information.</div>
     </div>
-    <div id="input-area">
-        <div id="input-wrapper">
-            <div id="image-preview-area">
-                <img id="image-preview" src="" alt="Preview">
-                <button id="remove-image">✕</button>
-            </div>
-            <div id="input-top">
-                <textarea id="input" placeholder="Message Infinity AI..." rows="1"></textarea>
-                <div id="input-actions">
-                    <button id="image-upload-btn" title="Upload image">🖼️</button>
-                    <button id="send">➤</button>
-                </div>
-            </div>
-            <div id="input-bottom">
-                <button id="model-picker">♾️ INF-1 ▾</button>
-                <span id="hint">Shift+Enter for new line</span>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
-
-<input type="file" id="file-input" accept="image/*" style="display:none">
 
 <script>
-    // ── Firebase config ───────────────────────────────────────────────────────
- const firebaseConfig = {
-  apiKey: "AIzaSyD2RqOYlQORMompDXkNXCYDQdbyyIz2NH0",
-  authDomain: "infinityai-fbb54.firebaseapp.com",
-  projectId: "infinityai-fbb54",
-  storageBucket: "infinityai-fbb54.firebasestorage.app",
-  messagingSenderId: "790452347537",
-  appId: "1:790452347537:web:4c11d0499d702b2e581530"
-};
-    // ─────────────────────────────────────────────────────────────────────────
+  // ── INF-1 Configuration — fill in your details below ──────────────────────
+  const INF1_API_URL = "https://YOUR-API-ENDPOINT-HERE";  // 🔴 Replace with your API URL
+  const INF1_API_KEY = "YOUR-API-KEY-HERE";               // 🔴 Replace with your API key
+  // ──────────────────────────────────────────────────────────────────────────
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    let currentChatId = null;
-    let chatHistory = [];
-    let isLoggedIn = false;
-    let currentModel = "inf1";
-    let pendingImage = null;
-
-    const modelNames = {
-        "inf1": "♾️ INF-1",
-        "inf1-turbo": "⚡ INF-1 Turbo",
-        "inf1-reason": "🧠 INF-1 Reason",
-        "inf1-code": "💻 INF-1 Code"
-    };
-
-    // ── Auth ──────────────────────────────────────────────────────────────────
-    document.getElementById("sign-in-btn").onclick = () => {
-        document.getElementById("login-modal").classList.add("open");
-    };
-    document.getElementById("google-signin").onclick = () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(err => console.error(err));
-    };
-    document.getElementById("close-login").onclick = () => {
-        document.getElementById("login-modal").classList.remove("open");
-    };
-    auth.onAuthStateChanged(async user => {
-        if (user) {
-            document.getElementById("login-modal").classList.remove("open");
-            document.getElementById("sign-in-btn").style.display = "none";
-            document.getElementById("user-profile").style.display = "flex";
-            document.getElementById("user-name").textContent = user.displayName;
-            document.getElementById("user-photo").src = user.photoURL;
-            isLoggedIn = true;
-            const token = await user.getIdToken();
-            await fetch("/verify_token", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({token})
-            });
-            loadChats();
-        } else {
-            document.getElementById("sign-in-btn").style.display = "block";
-            document.getElementById("user-profile").style.display = "none";
-            isLoggedIn = false;
-        }
-    });
-    document.getElementById("logout-btn").onclick = async () => {
-        await auth.signOut();
-        await fetch("/logout", {method: "POST"});
-        document.getElementById("chat-list").innerHTML = "";
-        resetChat();
-    };
-
-    // ── Model picker ──────────────────────────────────────────────────────────
-    document.getElementById("model-picker").onclick = (e) => {
-        e.stopPropagation();
-        document.getElementById("model-dropdown").classList.toggle("open");
-    };
-    document.querySelectorAll(".model-option").forEach(opt => {
-        opt.onclick = () => {
-            currentModel = opt.dataset.model;
-            document.getElementById("model-picker").textContent = modelNames[currentModel] + " ▾";
-            document.querySelectorAll(".model-option").forEach(o => o.classList.remove("active"));
-            opt.classList.add("active");
-            document.getElementById("model-dropdown").classList.remove("open");
-        };
-    });
-    document.addEventListener("click", () => {
-        document.getElementById("model-dropdown").classList.remove("open");
+  async function callINF1(userMessage) {
+    const res = await fetch(INF1_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${INF1_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "INF-1",
+        messages: [{ role: "user", content: userMessage }]
+      })
     });
 
-    // ── Image upload ──────────────────────────────────────────────────────────
-    document.getElementById("image-upload-btn").onclick = () => {
-        document.getElementById("file-input").click();
-    };
-    document.getElementById("file-input").onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            pendingImage = ev.target.result;
-            document.getElementById("image-preview").src = pendingImage;
-            document.getElementById("image-preview-area").style.display = "block";
-        };
-        reader.readAsDataURL(file);
-    };
-    document.getElementById("remove-image").onclick = () => {
-        pendingImage = null;
-        document.getElementById("image-preview-area").style.display = "none";
-        document.getElementById("file-input").value = "";
-    };
+    if (!res.ok) throw new Error(`INF-1 error: ${res.status}`);
 
-    // ── Paste image ───────────────────────────────────────────────────────────
-    document.getElementById("input").addEventListener("paste", (e) => {
-        const items = e.clipboardData.items;
-        for (const item of items) {
-            if (item.type.startsWith("image/")) {
-                const file = item.getAsFile();
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    pendingImage = ev.target.result;
-                    document.getElementById("image-preview").src = pendingImage;
-                    document.getElementById("image-preview-area").style.display = "block";
-                };
-                reader.readAsDataURL(file);
-                e.preventDefault();
-            }
-        }
-    });
+    const data = await res.json();
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
-    function resetChat() {
-        currentChatId = null;
-        chatHistory = [];
-        document.getElementById("messages").innerHTML = `
-            <div id="welcome">
-                <h1>♾️ Infinity AI</h1>
-                <p>Your intelligent assistant. Ask me anything.</p>
-                <div class="suggestion-chips">
-                    <button class="chip" onclick="useChip(this)">✍️ Help me write something</button>
-                    <button class="chip" onclick="useChip(this)">💻 Help me code</button>
-                    <button class="chip" onclick="useChip(this)">🔍 Search the web</button>
-                    <button class="chip" onclick="useChip(this)">🧠 Explain a concept</button>
-                </div>
-            </div>`;
-        document.getElementById("chat-title").textContent = "New Chat";
+    // 🔴 Adjust the line below to match how your API returns its response.
+    // Common formats:
+    //   data.choices[0].message.content  ← OpenAI-style
+    //   data.reply                        ← simple { reply: "..." }
+    //   data.output                       ← some custom APIs
+    //   data.response                     ← another common format
+    return data.choices[0].message.content;
+  }
+
+  let isTyping = false;
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function getTime() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function hideWelcome() {
+    const w = document.getElementById('welcome');
+    if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '0'; setTimeout(() => w.remove(), 300); }
+  }
+
+  function appendMessage(role, text) {
+    hideWelcome();
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.style.animationDelay = '0s';
+    const isAI = role === 'ai';
+    div.innerHTML = `
+      <div class="msg-avatar">${isAI ? '∞' : 'U'}</div>
+      <div class="msg-body">
+        <div class="msg-sender">${isAI ? 'Infinity AI' : 'You'}</div>
+        <div class="msg-bubble">${text}</div>
+        <div class="msg-meta">
+          <span class="msg-time">${getTime()}</span>
+          ${isAI ? `<div class="msg-actions">
+            <button class="mact" title="Copy">⎘</button>
+            <button class="mact" title="Like">♡</button>
+            <button class="mact" title="Dislike">↺</button>
+          </div>` : ''}
+        </div>
+      </div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  function showTyping() {
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg ai'; div.id = 'typingIndicator';
+    div.innerHTML = `
+      <div class="msg-avatar">∞</div>
+      <div class="msg-body">
+        <div class="msg-sender">Infinity AI</div>
+        <div class="msg-bubble" style="padding:14px 18px">
+          <div class="typing"><span></span><span></span><span></span></div>
+        </div>
+      </div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typingIndicator');
+    if (t) t.remove();
+  }
+
+  async function sendMessage() {
+    if (isTyping) return;
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = ''; input.style.height = 'auto';
+    document.getElementById('sendBtn').disabled = true;
+    isTyping = true;
+
+    appendMessage('user', text);
+    showTyping();
+
+    try {
+      const reply = await callINF1(text);
+      removeTyping();
+      appendMessage('ai', reply);
+      addHistory(text);
+    } catch (err) {
+      removeTyping();
+      appendMessage('ai', '⚠️ INF-1 is not connected yet. Please plug in your API.');
+    } finally {
+      isTyping = false;
+      document.getElementById('sendBtn').disabled = false;
     }
+  }
 
-    function useChip(btn) {
-        document.getElementById("input").value = btn.textContent.slice(2).trim();
-        document.getElementById("input").focus();
-    }
+  function sendSuggestion(btn) {
+    const text = btn.textContent.replace(/^[^\w]+/, '').trim();
+    document.getElementById('chatInput').value = text;
+    sendMessage();
+  }
 
-    document.getElementById("new-chat-btn").onclick = async () => {
-        const res = await fetch("/new_chat", {method: "POST"});
-        const data = await res.json();
-        currentChatId = data.chat_id;
-        chatHistory = [];
-        document.getElementById("messages").innerHTML = "";
-        document.getElementById("chat-title").textContent = "New Chat";
-        document.querySelectorAll(".chat-item").forEach(i => i.classList.remove("active"));
-    };
+  function addHistory(text) {
+    const list = document.getElementById('historyList');
+    const items = list.querySelectorAll('.history-item');
+    items.forEach(i => i.classList.remove('active'));
 
-    async function loadChats() {
-        const res = await fetch("/get_chats");
-        const data = await res.json();
-        const list = document.getElementById("chat-list");
-        list.innerHTML = "";
-        data.chats.forEach(chat => {
-            const div = document.createElement("div");
-            div.className = "chat-item" + (chat.id === currentChatId ? " active" : "");
-            div.textContent = chat.title;
-            div.onclick = () => loadChat(chat.id, chat.title);
-            list.appendChild(div);
-        });
-    }
+    const el = document.createElement('div');
+    el.className = 'history-item active';
+    el.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>${text.length > 28 ? text.slice(0,28)+'…' : text}`;
+    list.insertBefore(el, list.firstChild);
+    if (list.children.length > 8) list.removeChild(list.lastChild);
+  }
 
-    async function loadChat(chatId, title) {
-        currentChatId = chatId;
-        chatHistory = [];
-        document.getElementById("chat-title").textContent = title;
-        const res = await fetch(`/get_chat/${chatId}`);
-        const data = await res.json();
-        document.getElementById("messages").innerHTML = "";
-        data.messages.forEach(msg => {
-            addMessage(msg.content, msg.role === "user" ? "user" : "ai");
-            chatHistory.push(msg);
-        });
-        document.querySelectorAll(".chat-item").forEach(i => {
-            i.classList.toggle("active", i.textContent === title);
-        });
-    }
-
-    // ── Messages ──────────────────────────────────────────────────────────────
-    function formatMessage(text) {
-        text = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
-            const language = lang || "plaintext";
-            const highlighted = hljs.highlight(code.trim(), {language, ignoreIllegals: true}).value;
-            return `<div class="code-wrapper">
-                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-                <pre><code class="hljs language-${language}">${highlighted}</code></pre>
-            </div>`;
-        });
-        text = text.replace(/`([^`]+)`/g, '<code style="background:#1a1a1a;padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
-        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        text = text.replace(/\n/g, '<br>');
-        return text;
-    }
-
-    function copyCode(btn) {
-        const code = btn.nextElementSibling.textContent;
-        navigator.clipboard.writeText(code);
-        btn.textContent = "Copied!";
-        btn.classList.add("copied");
-        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
-    }
-
-    function addMessage(text, type, imageUrl = null) {
-        const welcome = document.getElementById("welcome");
-        if (welcome) welcome.remove();
-        const messages = document.getElementById("messages");
-        const div = document.createElement("div");
-        div.className = `message ${type}`;
-        let content = type === "ai" ? formatMessage(text) : text.replace(/</g, "&lt;");
-        let imageHtml = imageUrl ? `<img src="${imageUrl}" class="pasted-image" alt="uploaded">` : "";
-        div.innerHTML = `
-            <div class="avatar">${type === "user" ? "👤" : "♾️"}</div>
-            <div class="message-bubble">${imageHtml}${content}</div>
-        `;
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
-        return div;
-    }
-
-    function addLoadingMessage() {
-        const welcome = document.getElementById("welcome");
-        if (welcome) welcome.remove();
-        const messages = document.getElementById("messages");
-        const div = document.createElement("div");
-        div.className = "message ai";
-        div.id = "loading-msg";
-        div.innerHTML = `
-            <div class="avatar">♾️</div>
-            <div class="message-bubble"><span class="infinity-loader">♾️</span></div>
-        `;
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
-        return div;
-    }
-
-    // ── Send ──────────────────────────────────────────────────────────────────
-    async function sendMessage() {
-        const input = document.getElementById("input");
-        const text = input.value.trim();
-        if (!text && !pendingImage) return;
-
-        if (!currentChatId) {
-            const res = await fetch("/new_chat", {method: "POST"});
-            const data = await res.json();
-            currentChatId = data.chat_id;
-        }
-
-        input.value = "";
-        input.style.height = "auto";
-        document.getElementById("send").disabled = true;
-
-        const imageToSend = pendingImage;
-        addMessage(text, "user", imageToSend);
-        chatHistory.push({role: "user", content: text});
-
-        // Clear image
-        pendingImage = null;
-        document.getElementById("image-preview-area").style.display = "none";
-        document.getElementById("file-input").value = "";
-
-        // Show loading
-        document.getElementById("loading-overlay").classList.add("show");
-        addLoadingMessage();
-
-        const res = await fetch("/chat", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                message: text,
-                chat_id: currentChatId,
-                model: currentModel,
-                history: chatHistory.slice(-10),
-                image: imageToSend,
-            })
-        });
-
-        document.getElementById("loading-overlay").classList.remove("show");
-        const loadingMsg = document.getElementById("loading-msg");
-        if (loadingMsg) loadingMsg.remove();
-
-        const data = await res.json();
-        const reply = data.response;
-        addMessage(reply, "ai");
-        chatHistory.push({role: "assistant", content: reply});
-
-        document.getElementById("send").disabled = false;
-        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
-
-        if (isLoggedIn) loadChats();
-        if (chatHistory.length === 2) {
-            document.getElementById("chat-title").textContent = text.slice(0, 40);
-        }
-    }
-
-    document.getElementById("send").onclick = sendMessage;
-    document.getElementById("input").addEventListener("keydown", e => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
-    document.getElementById("input").addEventListener("input", function() {
-        this.style.height = "auto";
-        this.style.height = Math.min(this.scrollHeight, 150) + "px";
-    });
-
-    // ── Settings ──────────────────────────────────────────────────────────────
-    document.getElementById("settings-btn").onclick = () => {
-        document.getElementById("settings-panel").classList.toggle("open");
-    };
-    document.getElementById("close-settings").onclick = () => {
-        document.getElementById("settings-panel").classList.remove("open");
-    };
-    document.getElementById("temp-slider").oninput = function() {
-        document.getElementById("temp-value").textContent = this.value;
-    };
-    document.getElementById("theme-select").onchange = function() {
-        const themes = {
-            dark: { bg: "#0a0a0a", sidebar: "#111" },
-            darker: { bg: "#050505", sidebar: "#0a0a0a" },
-            midnight: { bg: "#060614", sidebar: "#0a0a1a" },
-            forest: { bg: "#060a06", sidebar: "#0a110a" }
-        };
-        const t = themes[this.value];
-        document.body.style.background = t.bg;
-        document.getElementById("sidebar").style.background = t.sidebar;
-    };
-    document.getElementById("font-size-select").onchange = function() {
-        document.getElementById("messages").style.fontSize = this.value;
-    };
-    document.getElementById("toggle-sidebar").onclick = () => {
-        document.getElementById("sidebar").classList.toggle("collapsed");
-    };
-
-    // Suggestion chips
-    function useChip(btn) {
-        document.getElementById("input").value = btn.textContent.slice(2).trim();
-        document.getElementById("input").focus();
-    }
+  function newChat() {
+    const msgs = document.getElementById('messages');
+    msgs.innerHTML = `
+      <div class="welcome" id="welcome">
+        <div class="welcome-orb">∞</div>
+        <h1>How can I help you today?</h1>
+        <p>Infinity AI is ready to assist you with anything — from creative projects to complex analysis and beyond.</p>
+        <div class="suggestions">
+          <button class="sug-btn" onclick="sendSuggestion(this)">✦ Write me a product pitch</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">⚡ Summarise this document</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">🔭 Explain quantum computing</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">🎨 Design ideas for my brand</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">📊 Analyse my data</button>
+          <button class="sug-btn" onclick="sendSuggestion(this)">💡 Help me brainstorm</button>
+        </div>
+      </div>`;
+    document.querySelectorAll('.history-item').forEach(i => i.classList.remove('active'));
+  }
 </script>
 </body>
 </html>
