@@ -1,33 +1,28 @@
-# INF-1.0 upgrade
+# INF-1.0 Premium
 
-This is a fuller rewrite of the original Infinity AI Flask prototype.
-
-## Included changes
-
-- fixed broken Flask routes for chat loading and deletion
-- rebuilt the app into a maintainable Flask structure
-- added local email/password auth
-- kept guest login for quick access
-- kept Firebase token verification support for Google login
-- added SQLite persistence for users, settings, chats, and messages
-- added working DuckDuckGo web search
-- added visible source cards in the UI for search results
-- added INF-1.0 auto routing across specialist models
-- added INF-1.0 all-model synthesis mode
-- made image uploads trigger the vision flow by default
-- added personalization settings, response style, theme, default model, and web search mode
-- rebuilt the UI to feel closer to modern AI chat products
+A polished Flask-based AI workspace with:
+- guest mode that works immediately
+- local signup/login and optional Firebase Google login
+- saved chats for signed-in users
+- premium glassmorphism UI with animations
+- settings for themes, personalization, response style, and default model
+- image upload with automatic vision handling
+- background web search support
+- INF-1.0 auto routing and all-model synthesis mode
 
 ## Required environment variables
 
 ```bash
 SECRET_KEY=change-me
 GROQ_API_KEY=your_groq_api_key
-FIREBASE_CREDENTIALS={...json service account...}
 PORT=8080
 ```
 
-`FIREBASE_CREDENTIALS` is optional unless you want Firebase-backed Google login.
+Optional for Google login:
+
+```bash
+FIREBASE_CREDENTIALS={...json service account...}
+```
 
 ## Local run
 
@@ -38,18 +33,8 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Firebase login note
+## Notes
 
-To enable browser-side Google sign-in, add your Firebase web config to `static/app.js`.
-The backend already supports Firebase ID token verification if `FIREBASE_CREDENTIALS` is configured.
-
-## Default modes
-
-- `INF-1.0`: automatically routes the request to the best internal specialist
-- `INF-1.0 All-model synthesis`: runs multiple specialists and merges them into one answer
-- image attached: vision path is used automatically
-
-## Important limitation
-
-This package gives you a strong working base, but you still need to plug in your own production secrets,
-Firebase config, and deployment settings before pushing live.
+- Guest users can chat immediately.
+- Signing in is only needed for saved chat history and synced settings.
+- Add your Firebase web config inside `static/app.js` by setting `window.firebaseConfig` if you want Google sign-in.

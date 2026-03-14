@@ -605,8 +605,16 @@ def logout():
 def me():
     user = get_session_user()
     if not user:
-        return jsonify({"logged_in": False})
-    return jsonify({"logged_in": True, "user": user, "settings": get_user_settings(user["user_id"])})
+        return jsonify({
+            "logged_in": False,
+            "user": None,
+            "settings": DEFAULT_SETTINGS.copy(),
+        })
+    return jsonify({
+        "logged_in": True,
+        "user": user,
+        "settings": get_user_settings(user["user_id"]),
+    })
 
 
 @app.get("/settings")
@@ -620,20 +628,31 @@ def settings_get():
 @app.post("/settings")
 def settings_post():
     user = get_session_user()
-    if not user:
-        return jsonify({"error": "Not logged in."}), 401
     payload = request.json or {}
-    saved = update_user_settings(user["user_id"], payload)
-    return jsonify({"success": True, "settings": saved})
+    clean_settings = {
+        "display_name": (payload.get("display_name") or "").strip(),
+        "personalization": (payload.get("personalization") or "").strip(),
+        "theme": payload.get("theme") or "dark",
+        "default_model": "inf-1.0",
+        "web_search": payload.get("web_search") or "auto",
+        "response_style": payload.get("response_style") or "balanced",
+    }
+    if not user:
+        return jsonify({"success": True, "settings": clean_settings, "saved": False})
+    saved = update_user_settings(user["user_id"], clean_settings)
+    return jsonify({"success": True, "settings": saved, "saved": True})
 
 
 @app.post("/new_chat")
 def new_chat():
     user = get_session_user()
     if not user:
-        return jsonify({"error": "Not logged in."}), 401
+        return jsonify({
+            "chat_id": f"guest-{uuid.uuid4()}",
+            "saved": False,
+        })
     chat_id = create_chat_for_user(user["user_id"])
-    return jsonify({"chat_id": chat_id})
+    return jsonify({"chat_id": chat_id, "saved": True})
 
 
 @app.get("/get_chats")
@@ -656,16 +675,14 @@ def get_chat(chat_id: str):
 def delete_chat(chat_id: str):
     user = get_session_user()
     if not user:
-        return jsonify({"error": "Not logged in."}), 401
+        return jsonify({"success": True, "deleted": False})
     delete_chat_for_user(user["user_id"], chat_id)
-    return jsonify({"success": True})
+    return jsonify({"success": True, "deleted": True})
 
 
 @app.post("/chat")
 def chat():
     user = get_session_user()
-    if not user:
-        return jsonify({"error": "Please log in first."}), 401
 
     payload = request.json or {}
     chat_id = payload.get("chat_id")
@@ -676,11 +693,11 @@ def chat():
     if not raw_user_message and not image_data:
         return jsonify({"error": "Message or image is required."}), 400
 
-    if not chat_id:
+    if user and not chat_id:
         chat_id = create_chat_for_user(user["user_id"])
 
-    settings = get_user_settings(user["user_id"])
-    selected_model = payload.get("model") or settings.get("default_model", "inf-1.0")
+    settings = get_user_settings(user["user_id"]) if user else DEFAULT_SETTINGS.copy()
+    selected_model = "inf-1.0"
     web_mode = payload.get("web_search") or settings.get("web_search", "auto")
 
     try:
@@ -688,7 +705,6 @@ def chat():
         messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}] + history
         augmented_user_message = raw_user_message
         vision_summary = ""
-        search_context = ""
         sources: List[Dict[str, str]] = []
 
         if image_data:
@@ -701,45 +717,29 @@ def chat():
         if needs_web_search(augmented_user_message, web_mode):
             search_context, sources = duckduckgo_search(augmented_user_message)
             augmented_user_message = (
-                f"{augmented_user_message}\n\nDuckDuckGo search context:\n{search_context}\n\n"
+                f"{augmented_user_message}\n\nWeb search context:\n{search_context}\n\n"
                 "Ground claims in the supplied search context when relevant and say when evidence is thin."
             )
 
         messages.append({"role": "user", "content": augmented_user_message})
-
         if image_data:
-            used_mode = "vision"
-            if selected_model == "inf-1.0-all":
-                reply = ensemble_reply(messages)
-                used_mode = "vision+inf-1.0-all"
-            elif selected_model == "inf-1.0":
-                reply = call_model(MODELS["chat"], messages)
-                used_mode = "vision+inf-1.0"
-            else:
-                model_name = MODELS.get(selected_model, MODELS["chat"])
-                reply = call_model(model_name, messages)
-                used_mode = f"vision+{selected_model}"
+            reply = ensemble_reply(messages)
+            used_mode = "vision+inf-1.0"
         else:
-            if selected_model == "inf-1.0":
-                routed = choose_model(augmented_user_message)
-                reply = call_model(MODELS[routed], messages)
-                used_mode = f"inf-1.0/{routed}"
-            elif selected_model == "inf-1.0-all":
-                reply = ensemble_reply(messages)
-                used_mode = "inf-1.0-all"
-            else:
-                model_name = MODELS.get(selected_model, MODELS["chat"])
-                reply = call_model(model_name, messages)
-                used_mode = selected_model
+            reply = ensemble_reply(messages)
+            used_mode = "inf-1.0"
 
-        saved_user_content = raw_user_message or "[image]"
-        save_messages(user["user_id"], chat_id, saved_user_content, reply)
+        if user and chat_id:
+            saved_user_content = raw_user_message or "[image]"
+            save_messages(user["user_id"], chat_id, saved_user_content, reply)
+
         return jsonify({
             "response": reply,
-            "chat_id": chat_id,
+            "chat_id": chat_id if user else None,
             "used_mode": used_mode,
             "sources": sources,
             "vision_summary": vision_summary,
+            "saved": bool(user and chat_id),
         })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

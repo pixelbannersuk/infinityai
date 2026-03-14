@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INF-1.0</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
+    <script>
+      window.firebaseConfig = null;
+    </script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+  </head>
+  <body data-theme="dark">
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-top">
+          <div class="brand-row">
+            <button class="ghost icon-only mobile-only" id="toggleSidebarBtn">☰</button>
+            <div class="brand-mark">∞</div>
+            <div class="brand-copy">
+              <div class="brand-title">INF-1.0</div>
+              <div class="brand-subtitle">Unified premium AI workspace</div>
+            </div>
+          </div>
+
+          <button class="primary full new-chat-btn" id="newChatBtn">+ New chat</button>
+
+          <div class="sidebar-section status-card">
+            <div class="status-title">Start instantly</div>
+            <div class="status-copy">Use guest mode right away. Sign in only if you want saved chats and synced settings.</div>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="sidebar-label">Saved chats</div>
+            <div id="historyList" class="history-list"></div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="user-card" id="userCard">
+            <div class="avatar" id="userAvatar">∞</div>
+            <div class="user-copy">
+              <div class="user-name" id="userName">Guest mode</div>
+              <div class="user-email" id="userEmail">Sign in only to save chats and sync settings</div>
+            </div>
+          </div>
+          <div class="footer-actions">
+            <button class="ghost" id="loginBtn">Login</button>
+            <button class="ghost" id="settingsBtn">Settings</button>
+            <button class="ghost" id="logoutBtn">Logout</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="ghost icon-only desktop-hidden" id="toggleSidebarBtn2">☰</button>
+            <div>
+              <div class="topbar-title">INF-1.0</div>
+              <div class="topbar-subtitle">Reasoning, coding, vision, and live web answers in one model</div>
+            </div>
+          </div>
+          <div class="topbar-right controls-row">
+            <div class="mode-pill">INF-1.0</div>
+            <select id="webSearchSelect">
+              <option value="auto">Web: Auto</option>
+              <option value="on">Web: On</option>
+              <option value="off">Web: Off</option>
+            </select>
+          </div>
+        </header>
+
+        <section id="messages" class="messages"></section>
+
+        <section class="source-panel hidden" id="sourcePanel">
+          <div class="source-panel-title">Sources</div>
+          <div id="sourceList" class="source-list"></div>
+        </section>
+
+        <footer class="composer-wrap">
+          <div class="upload-preview hidden" id="uploadPreview"></div>
+          <form id="composerForm" class="composer">
+            <label class="ghost icon-only" for="imageInput" title="Attach image">＋</label>
+            <input id="imageInput" type="file" accept="image/*" hidden />
+            <textarea id="promptInput" rows="1" placeholder="Message INF-1.0"></textarea>
+            <button type="submit" class="primary send-btn" id="sendBtn">Send</button>
+          </form>
+          <div class="composer-footnote">Attach an image and INF-1.0 automatically switches to vision.</div>
+        </footer>
+      </main>
+    </div>
+
+    <div class="modal hidden" id="authModal">
+      <div class="modal-card auth-card">
+        <div class="modal-head">
+          <h2>Sign in to INF-1.0</h2>
+          <button class="ghost icon-only" data-close="authModal">✕</button>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="tab active" data-auth-tab="login">Login</button>
+          <button class="tab" data-auth-tab="signup">Sign up</button>
+        </div>
+
+        <div class="auth-pane" id="authPaneLogin">
+          <label>
+            <span>Email</span>
+            <input id="loginEmail" type="email" placeholder="you@example.com" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="loginPassword" type="password" placeholder="Password" />
+          </label>
+          <button class="primary full" id="localLoginBtn">Login</button>
+        </div>
+
+        <div class="auth-pane hidden" id="authPaneSignup">
+          <label>
+            <span>Name</span>
+            <input id="signupName" type="text" placeholder="Your name" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input id="signupEmail" type="email" placeholder="you@example.com" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="signupPassword" type="password" placeholder="At least 8 characters" />
+          </label>
+          <button class="primary full" id="localSignupBtn">Create account</button>
+        </div>
+
+        <div class="auth-separator"><span>or</span></div>
+        <div class="stack gap-12">
+          <button class="ghost full" id="googleLoginBtn">Continue with Google</button>
+          <button class="ghost full" id="guestLoginBtn">Continue as guest</button>
+        </div>
+        <p class="muted small-note">Google sign-in becomes active after you add your Firebase web config.</p>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="settingsModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h2>Settings</h2>
+          <button class="ghost icon-only" data-close="settingsModal">✕</button>
+        </div>
+        <div class="settings-grid">
+          <label>
+            <span>Display name</span>
+            <input id="settingsDisplayName" type="text" placeholder="How INF-1.0 should address you" />
+          </label>
+          <label>
+            <span>Theme</span>
+            <select id="settingsTheme">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="midnight">Midnight</option>
+            </select>
+          </label>
+          <label>
+            <span>Web search</span>
+            <select id="settingsWebSearch">
+              <option value="auto">Auto</option>
+              <option value="on">Always on</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label>
+            <span>Response style</span>
+            <select id="settingsResponseStyle">
+              <option value="balanced">Balanced</option>
+              <option value="concise">Concise</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </label>
+          <label class="full-span">
+            <span>Personalization</span>
+            <textarea id="settingsPersonalization" rows="6" placeholder="Example: Keep answers practical, polished, and strong on product thinking."></textarea>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="ghost" data-close="settingsModal">Cancel</button>
+          <button class="primary" id="saveSettingsBtn">Save settings</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
