@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>INF-1.0</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}" />
+    <script>
+      window.firebaseConfig = null;
+    </script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script defer src="{{ url_for('static', filename='app.js') }}"></script>
   </head>
   <body data-theme="dark">
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-top">
@@ -18,12 +23,19 @@
             <div class="brand-mark">∞</div>
             <div class="brand-copy">
               <div class="brand-title">INF-1.0</div>
-              <div class="brand-subtitle">Unified AI workspace</div>
+              <div class="brand-subtitle">Unified premium AI workspace</div>
             </div>
           </div>
-          <button class="primary full" id="newChatBtn">+ New chat</button>
+
+          <button class="primary full new-chat-btn" id="newChatBtn">+ New chat</button>
+
+          <div class="sidebar-section status-card">
+            <div class="status-title">Start instantly</div>
+            <div class="status-copy">Use guest mode right away. Sign in only if you want saved chats and synced settings.</div>
+          </div>
+
           <div class="sidebar-section">
-            <div class="sidebar-label">Recent chats</div>
+            <div class="sidebar-label">Saved chats</div>
             <div id="historyList" class="history-list"></div>
           </div>
         </div>
@@ -32,8 +44,8 @@
           <div class="user-card" id="userCard">
             <div class="avatar" id="userAvatar">∞</div>
             <div class="user-copy">
-              <div class="user-name" id="userName">Not signed in</div>
-              <div class="user-email" id="userEmail">Use guest, local login, or Firebase login</div>
+              <div class="user-name" id="userName">Guest mode</div>
+              <div class="user-email" id="userEmail">Sign in only to save chats and sync settings</div>
             </div>
           </div>
           <div class="footer-actions">
@@ -50,45 +62,23 @@
             <button class="ghost icon-only desktop-hidden" id="toggleSidebarBtn2">☰</button>
             <div>
               <div class="topbar-title">INF-1.0</div>
-              <div class="topbar-subtitle">Chat, reasoning, coding, search, and vision</div>
+              <div class="topbar-subtitle">Reasoning, coding, vision, and live web answers in one model</div>
             </div>
           </div>
           <div class="topbar-right controls-row">
-            <select id="modelSelect">
-              <option value="inf-1.0">INF-1.0 Auto</option>
-              <option value="inf-1.0-all">INF-1.0 All-model synthesis</option>
-              <option value="chat">Chat</option>
-              <option value="reason">Reason</option>
-              <option value="code">Code</option>
-              <option value="fast">Fast</option>
-            </select>
+            <div class="mode-pill">INF-1.0</div>
             <select id="webSearchSelect">
-              <option value="auto">DuckDuckGo: Auto</option>
-              <option value="on">DuckDuckGo: On</option>
-              <option value="off">DuckDuckGo: Off</option>
+              <option value="auto">Web: Auto</option>
+              <option value="on">Web: On</option>
+              <option value="off">Web: Off</option>
             </select>
           </div>
         </header>
 
-        <section id="messages" class="messages">
-          <div class="hero-card">
-            <div class="hero-pill">INF-1.0</div>
-            <h1>What do you want to work on?</h1>
-            <p>
-              Search the web with DuckDuckGo, route requests across models, attach images for vision-first analysis,
-              and personalise the assistant from settings.
-            </p>
-            <div class="suggestions">
-              <button class="suggestion">Find the latest AI product news and summarise the biggest updates</button>
-              <button class="suggestion">Review this Python code for bugs and cleanup</button>
-              <button class="suggestion">Create a product strategy for a student startup</button>
-              <button class="suggestion">Explain this image and answer my question</button>
-            </div>
-          </div>
-        </section>
+        <section id="messages" class="messages"></section>
 
         <section class="source-panel hidden" id="sourcePanel">
-          <div class="source-panel-title">DuckDuckGo sources</div>
+          <div class="source-panel-title">Sources</div>
           <div id="sourceList" class="source-list"></div>
         </section>
 
@@ -100,9 +90,7 @@
             <textarea id="promptInput" rows="1" placeholder="Message INF-1.0"></textarea>
             <button type="submit" class="primary send-btn" id="sendBtn">Send</button>
           </form>
-          <div class="composer-footnote">
-            When an image is attached, vision becomes the default path automatically.
-          </div>
+          <div class="composer-footnote">Attach an image and INF-1.0 automatically switches to vision.</div>
         </footer>
       </main>
     </div>
@@ -152,9 +140,7 @@
           <button class="ghost full" id="googleLoginBtn">Continue with Google</button>
           <button class="ghost full" id="guestLoginBtn">Continue as guest</button>
         </div>
-        <p class="muted small-note">
-          Firebase login becomes active after you add your Firebase web config in <code>static/app.js</code>.
-        </p>
+        <p class="muted small-note">Google sign-in becomes active after you add your Firebase web config.</p>
       </div>
     </div>
 
@@ -174,21 +160,11 @@
             <select id="settingsTheme">
               <option value="dark">Dark</option>
               <option value="light">Light</option>
+              <option value="midnight">Midnight</option>
             </select>
           </label>
           <label>
-            <span>Default model</span>
-            <select id="settingsDefaultModel">
-              <option value="inf-1.0">INF-1.0 Auto</option>
-              <option value="inf-1.0-all">INF-1.0 All-model synthesis</option>
-              <option value="chat">Chat</option>
-              <option value="reason">Reason</option>
-              <option value="code">Code</option>
-              <option value="fast">Fast</option>
-            </select>
-          </label>
-          <label>
-            <span>DuckDuckGo search</span>
+            <span>Web search</span>
             <select id="settingsWebSearch">
               <option value="auto">Auto</option>
               <option value="on">Always on</option>
@@ -205,7 +181,7 @@
           </label>
           <label class="full-span">
             <span>Personalization</span>
-            <textarea id="settingsPersonalization" rows="6" placeholder="Example: Keep answers practical, clean, and strong on code quality."></textarea>
+            <textarea id="settingsPersonalization" rows="6" placeholder="Example: Keep answers practical, polished, and strong on product thinking."></textarea>
           </label>
         </div>
         <div class="modal-actions">
