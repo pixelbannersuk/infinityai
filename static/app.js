@@ -28,6 +28,19 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function toast(message) {
+  let el = document.querySelector(".toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
 async function api(path, options = {}) {
   const config = {
     credentials: "same-origin",
@@ -38,23 +51,12 @@ async function api(path, options = {}) {
     },
   };
 
-  if (config.body instanceof FormData) {
-    delete config.headers["Content-Type"];
-  }
-
   const res = await fetch(path, config);
   const contentType = res.headers.get("content-type") || "";
-
-  let data;
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    data = { raw: text };
-  }
+  const data = contentType.includes("application/json") ? await res.json() : await res.text();
 
   if (!res.ok) {
-    throw new Error(data?.error || data?.message || `Request failed: ${res.status}`);
+    throw new Error(data?.error || "Request failed");
   }
 
   return data;
@@ -91,7 +93,7 @@ function autoResizeTextarea() {
   const input = qs("promptInput");
   if (!input) return;
   input.style.height = "auto";
-  input.style.height = `${Math.min(input.scrollHeight, 240)}px`;
+  input.style.height = `${Math.min(input.scrollHeight, 260)}px`;
 }
 
 function renderUser() {
@@ -108,28 +110,22 @@ function renderSettings() {
   qs("settingsDisplayName").value = s.display_name || "";
   qs("settingsPersonalization").value = s.personalization || "";
   qs("settingsTheme").value = s.theme || "dark";
-  qs("settingsDefaultModel").value = s.default_model || "inf-1.0";
   qs("settingsWebSearch").value = s.web_search || "auto";
   qs("settingsResponseStyle").value = s.response_style || "balanced";
-
-  qs("modelSelect").value = s.default_model || "inf-1.0";
   qs("webSearchSelect").value = s.web_search || "auto";
 }
 
 function renderHero() {
   qs("messages").innerHTML = `
-    <div class="hero-card">
+    <div class="hero-card premium-hero">
       <div class="hero-pill">INF-1.0</div>
-      <h1>What do you want to work on?</h1>
-      <p>
-        Search the web with DuckDuckGo, route requests across models, attach images for vision-first analysis,
-        and personalise the assistant from settings.
-      </p>
+      <h1>One premium AI that does it all.</h1>
+      <p>Ask anything. INF-1.0 silently combines reasoning, coding, vision, and live web context into one polished answer.</p>
       <div class="suggestions">
-        <button class="suggestion">Find the latest AI product news and summarise the biggest updates</button>
-        <button class="suggestion">Review this Python code for bugs and cleanup</button>
+        <button class="suggestion">Summarise the latest AI product news</button>
+        <button class="suggestion">Review this Python code for bugs and improvements</button>
         <button class="suggestion">Create a product strategy for a student startup</button>
-        <button class="suggestion">Explain this image and answer my question</button>
+        <button class="suggestion">Analyse this image and explain what matters</button>
       </div>
     </div>
   `;
@@ -143,45 +139,102 @@ function renderHero() {
   });
 }
 
+function renderRichText(content) {
+  const escaped = escapeHtml(content);
+  const codeBlocks = [];
+  let html = escaped.replace(/```(\w+)?
+([\s\S]*?)```/g, (_, lang, code) => {
+    const index = codeBlocks.push({ lang: lang || "", code }) - 1;
+    return `__CODE_BLOCK_${index}__`;
+  });
+
+  html = html
+    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/
+
+/g, "</p><p>")
+    .replace(/
+/g, "<br>");
+
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p><\/p>/g, "");
+
+  codeBlocks.forEach((block, index) => {
+    const replacement = `
+      <div class="code-block" data-copy="${encodeURIComponent(block.code)}">
+        <div class="code-block-top">
+          <span>${escapeHtml(block.lang || "code")}</span>
+          <button class="copy-code-btn" type="button">Copy</button>
+        </div>
+        <pre><code>${block.code}</code></pre>
+      </div>
+    `;
+    html = html.replace(`__CODE_BLOCK_${index}__`, replacement);
+  });
+
+  return html;
+}
+
+function attachCopyHandlers(scope = document) {
+  scope.querySelectorAll(".copy-code-btn").forEach((btn) => {
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", async () => {
+      const code = decodeURIComponent(btn.closest(".code-block")?.dataset.copy || "");
+      await navigator.clipboard.writeText(code);
+      const old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => (btn.textContent = old), 1400);
+    });
+  });
+
+  scope.querySelectorAll("[data-copy-message]").forEach((btn) => {
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", async () => {
+      const text = decodeURIComponent(btn.dataset.copyMessage || "");
+      await navigator.clipboard.writeText(text);
+      toast("Copied response");
+    });
+  });
+}
+
 function renderMessages() {
   if (!state.chatHistory.length) {
     renderHero();
     return;
   }
 
-  const html = state.chatHistory
+  qs("messages").innerHTML = state.chatHistory
     .map((msg) => {
       const label = msg.role === "user" ? "You" : (msg.label || "INF-1.0");
+      const actions = msg.role === "assistant"
+        ? `<div class="message-actions"><button class="mini-action" type="button" data-copy-message="${encodeURIComponent(msg.content)}">Copy</button></div>`
+        : "";
       return `
         <div class="message ${msg.role === "user" ? "user" : "assistant"}">
-          <div class="message-meta">${escapeHtml(label)}</div>
-          <div class="message-body">${escapeHtml(msg.content).replace(/\n/g, "<br>")}</div>
+          <div class="message-meta-row">
+            <div class="message-meta">${escapeHtml(label)}</div>
+            ${actions}
+          </div>
+          <div class="message-body rich-text">${msg.role === "assistant" ? renderRichText(msg.content) : escapeHtml(msg.content).replace(/
+/g, "<br>")}</div>
         </div>
       `;
     })
     .join("");
 
-  qs("messages").innerHTML = html;
+  attachCopyHandlers(qs("messages"));
   qs("messages").scrollTop = qs("messages").scrollHeight;
 }
 
 function appendMessage(role, content, label = null) {
-  const entry = { role, content, label };
-  state.chatHistory.push(entry);
-
-  const messagesEl = qs("messages");
-  if (messagesEl.querySelector(".hero-card")) {
-    messagesEl.innerHTML = "";
-  }
-
-  const wrapper = document.createElement("div");
-  wrapper.className = `message ${role === "user" ? "user" : "assistant"}`;
-  wrapper.innerHTML = `
-    <div class="message-meta">${escapeHtml(label || (role === "user" ? "You" : "INF-1.0"))}</div>
-    <div class="message-body">${escapeHtml(content).replace(/\n/g, "<br>")}</div>
-  `;
-  messagesEl.appendChild(wrapper);
-  wrapper.scrollIntoView({ behavior: "smooth", block: "end" });
+  state.chatHistory.push({ role, content, label });
+  renderMessages();
 }
 
 function renderSources(sources) {
@@ -199,7 +252,7 @@ function renderSources(sources) {
   list.innerHTML = state.sources
     .map(
       (source) => `
-        <a class="source-card" href="${escapeHtml(source.url || "#")}" target="_blank" rel="noopener noreferrer">
+        <a class="source-card fade-in" href="${escapeHtml(source.url || "#")}" target="_blank" rel="noopener noreferrer">
           <div class="source-title">${escapeHtml(source.title || "Untitled source")}</div>
           <div class="source-url">${escapeHtml(source.url || "")}</div>
           <div class="source-snippet">${escapeHtml(source.snippet || "")}</div>
@@ -215,7 +268,7 @@ function renderChats(chats) {
   if (!chats.length) {
     container.innerHTML = `
       <div class="history-empty">
-        ${state.currentUser ? "No saved chats yet" : "Sign in to save chat history"}
+        ${state.currentUser ? "No saved chats yet" : "Use guest mode freely. Sign in only to save chats."}
       </div>
     `;
     return;
@@ -224,11 +277,9 @@ function renderChats(chats) {
   container.innerHTML = chats
     .map(
       (chat) => `
-        <div class="history-item ${chat.chat_id === state.currentChatId ? "active" : ""}" data-chat-id="${escapeHtml(chat.chat_id)}">
-          <button class="history-open" data-open-chat="${escapeHtml(chat.chat_id)}">
-            ${escapeHtml(chat.title || "Untitled chat")}
-          </button>
-          <button class="history-delete" data-delete-chat="${escapeHtml(chat.chat_id)}" title="Delete chat">✕</button>
+        <div class="history-item ${chat.chat_id === state.currentChatId ? "active" : ""}">
+          <button class="history-open" data-open-chat="${escapeHtml(chat.chat_id)}">${escapeHtml(chat.title || "Untitled chat")}</button>
+          <button class="history-delete" data-delete-chat="${escapeHtml(chat.chat_id)}">✕</button>
         </div>
       `
     )
@@ -276,7 +327,6 @@ async function loadChats() {
 
 async function loadChat(chatId) {
   if (!state.currentUser) return;
-
   const data = await api(`/get_chat/${chatId}`, { method: "GET" });
   state.currentChatId = chatId;
   state.chatHistory = data.messages || [];
@@ -285,14 +335,12 @@ async function loadChat(chatId) {
 }
 
 async function createChat() {
+  state.currentChatId = `guest-${crypto.randomUUID()}`;
   state.chatHistory = [];
   renderMessages();
   renderSources([]);
 
-  if (!state.currentUser) {
-    state.currentChatId = `guest-${crypto.randomUUID()}`;
-    return;
-  }
+  if (!state.currentUser) return;
 
   const data = await api("/new_chat", { method: "POST" });
   state.currentChatId = data.chat_id;
@@ -301,14 +349,15 @@ async function createChat() {
 
 async function deleteChat(chatId) {
   if (!state.currentUser) return;
-
   await api(`/delete_chat/${chatId}`, { method: "DELETE" });
+
   if (state.currentChatId === chatId) {
     state.currentChatId = null;
     state.chatHistory = [];
     renderMessages();
     renderSources([]);
   }
+
   await loadChats();
 }
 
@@ -324,7 +373,7 @@ function setImagePreview(dataUrl, fileName) {
   const preview = qs("uploadPreview");
   preview.classList.remove("hidden");
   preview.innerHTML = `
-    <div class="upload-chip">
+    <div class="upload-chip fade-in">
       <img src="${dataUrl}" alt="Upload preview" />
       <div class="upload-copy">
         <div class="upload-name">${escapeHtml(fileName || "image")}</div>
@@ -346,6 +395,7 @@ async function handleImageSelection(file) {
 async function sendMessage() {
   const input = qs("promptInput");
   const message = input.value.trim();
+
   if (!message && !state.imageDataUrl) return;
 
   if (!state.currentChatId) {
@@ -357,8 +407,8 @@ async function sendMessage() {
   autoResizeTextarea();
 
   const typingEl = document.createElement("div");
-  typingEl.className = "message assistant";
-  typingEl.innerHTML = `<div class="message-meta">INF-1.0</div><div class="message-body">Thinking…</div>`;
+  typingEl.className = "message assistant fade-in";
+  typingEl.innerHTML = `<div class="message-meta-row"><div class="message-meta">INF-1.0</div></div><div class="message-body typing">Thinking<span></span><span></span><span></span></div>`;
   qs("messages").appendChild(typingEl);
   typingEl.scrollIntoView({ behavior: "smooth", block: "end" });
 
@@ -366,10 +416,11 @@ async function sendMessage() {
     const payload = {
       chat_id: state.currentUser ? state.currentChatId : null,
       message,
-      model: qs("modelSelect").value,
       web_search: qs("webSearchSelect").value,
       image: state.imageDataUrl,
-      history: state.chatHistory.map((m) => ({ role: m.role, content: m.content })),
+      history: state.chatHistory
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content })),
     };
 
     const data = await api("/chat", {
@@ -378,7 +429,7 @@ async function sendMessage() {
     });
 
     typingEl.remove();
-    appendMessage("assistant", data.response, data.used_mode ? `INF-1.0 · ${data.used_mode}` : "INF-1.0");
+    appendMessage("assistant", data.response, "INF-1.0");
 
     if (state.currentUser) {
       state.currentChatId = data.chat_id || state.currentChatId;
@@ -398,28 +449,28 @@ async function saveSettings() {
     display_name: qs("settingsDisplayName").value.trim(),
     personalization: qs("settingsPersonalization").value.trim(),
     theme: qs("settingsTheme").value,
-    default_model: qs("settingsDefaultModel").value,
     web_search: qs("settingsWebSearch").value,
     response_style: qs("settingsResponseStyle").value,
   };
 
   if (!state.currentUser) {
-    state.settings = { ...state.settings, ...payload };
+    state.settings = { ...state.settings, ...payload, default_model: "inf-1.0" };
     renderSettings();
     closeModal("settingsModal");
+    toast("Settings saved locally");
     return;
   }
 
   const data = await api("/settings", { method: "POST", body: JSON.stringify(payload) });
-  state.settings = data.settings;
+  state.settings = { ...data.settings, default_model: "inf-1.0" };
   renderSettings();
   closeModal("settingsModal");
+  toast("Settings saved");
 }
 
 async function localLogin() {
   const email = qs("loginEmail").value.trim();
   const password = qs("loginPassword").value;
-
   if (!email || !password) return;
 
   await api("/login", {
@@ -429,13 +480,13 @@ async function localLogin() {
 
   closeModal("authModal");
   await refreshSession();
+  toast("Signed in");
 }
 
 async function localSignup() {
   const name = qs("signupName").value.trim();
   const email = qs("signupEmail").value.trim();
   const password = qs("signupPassword").value;
-
   if (!name || !email || !password) return;
 
   await api("/signup", {
@@ -445,16 +496,19 @@ async function localSignup() {
 
   closeModal("authModal");
   await refreshSession();
+  toast("Account created");
 }
 
 async function guestLogin() {
-  await api("/guest_login", { method: "POST" }).catch(() => null);
   closeModal("authModal");
-  await refreshSession();
+  state.currentUser = null;
+  renderUser();
+  renderChats([]);
+  toast("Continuing in guest mode");
 }
 
 async function logout() {
-  await api("/logout", { method: "POST" });
+  await api("/logout", { method: "POST" }).catch(() => null);
   state.currentUser = null;
   state.currentChatId = null;
   state.chatHistory = [];
@@ -462,6 +516,7 @@ async function logout() {
   renderChats([]);
   renderMessages();
   renderSources([]);
+  toast("Signed out");
 }
 
 function initFirebase() {
@@ -486,13 +541,14 @@ async function googleLogin() {
   const result = await firebase.auth().signInWithPopup(provider);
   const idToken = await result.user.getIdToken();
 
-  await api("/firebase_login", {
+  await api("/verify_token", {
     method: "POST",
-    body: JSON.stringify({ id_token: idToken }),
+    body: JSON.stringify({ token: idToken }),
   });
 
   closeModal("authModal");
   await refreshSession();
+  toast("Signed in with Google");
 }
 
 function bindEvents() {
@@ -530,13 +586,8 @@ function bindEvents() {
     btn.addEventListener("click", () => closeModal(btn.dataset.close));
   });
 
-  qs("toggleSidebarBtn")?.addEventListener("click", () => {
-    qs("sidebar")?.classList.toggle("open");
-  });
-
-  qs("toggleSidebarBtn2")?.addEventListener("click", () => {
-    qs("sidebar")?.classList.toggle("open");
-  });
+  qs("toggleSidebarBtn")?.addEventListener("click", () => qs("sidebar")?.classList.toggle("open"));
+  qs("toggleSidebarBtn2")?.addEventListener("click", () => qs("sidebar")?.classList.toggle("open"));
 
   qs("settingsTheme")?.addEventListener("change", (e) => {
     document.body.setAttribute("data-theme", e.target.value);
