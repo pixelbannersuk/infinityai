@@ -63,11 +63,13 @@ function setAuthTab(active) {
 }
 
 function renderUser() {
+  function renderUser() {
   const user = state.currentUser;
-  qs("userName").textContent = user?.name || "Not signed in";
-  qs("userEmail").textContent = user?.email || (user ? `${user.auth_provider || "guest"} session` : "Use guest, local login, or Firebase login");
+  qs("userName").textContent = user?.name || "Guest mode";
+  qs("userEmail").textContent = user?.email || "Sign in only to save chats and sync settings";
   qs("userAvatar").textContent = user?.name?.[0]?.toUpperCase() || "∞";
 }
+
 
 function renderSettings() {
   qs("settingsDisplayName").value = state.settings.display_name || "";
