@@ -165,9 +165,10 @@ async function api(path, options = {}) {
   }
   return data;
 }
-
+  
 async function refreshSession() {
   const data = await api("/me", { method: "GET" }).catch(() => ({ logged_in: false }));
+
   if (data.logged_in) {
     state.currentUser = data.user;
     state.settings = { ...state.settings, ...data.settings };
@@ -177,9 +178,11 @@ async function refreshSession() {
   } else {
     state.currentUser = null;
     renderUser();
-    openModal("authModal");
+    renderSettings();
+    renderChats([]);
   }
 }
+
 
 async function loadChats() {
   const data = await api("/get_chats", { method: "GET" });
